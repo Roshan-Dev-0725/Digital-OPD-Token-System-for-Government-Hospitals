@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base Hospital Sammanthurai - OPD System</title>
+    <style>
+        :root {
+            --primary: #00796b;
+            --secondary: #004d40;
+            --light: #f4f4f4;
+            --dark: #212121;
+            --white: #ffffff;
+            --staff: #fbc02d; 
+        }
+
+        body, html { margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: #ccc; min-height: 100%; }
+        
+        .main-wrapper {
+            background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), 
+                        url('hospital.jpg');
+            background-size: cover; background-position: center; background-attachment: fixed;
+            min-height: 100vh; display: flex; flex-direction: column; align-items: center; color: var(--white);
+        }
+
+        .container { width: 90%; max-width: 500px; margin: 20px auto; display: none; animation: fadeIn 0.4s ease; }
+        .active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        header { text-align: center; padding: 30px 10px; }
+        .gov-logo { width: 50px; margin-bottom: 10px; }
+
+        .card { background: var(--white); color: var(--dark); padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); text-align: center; }
+        
+        .doc-card { 
+            background: #f9f9f9; color: #333; margin-bottom: 12px; padding: 15px; border-radius: 8px; 
+            text-align: left; border-left: 6px solid var(--primary); display: flex; justify-content: space-between; align-items: center; 
+        }
+
+        .form-group { text-align: left; margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+
+        .btn { display: block; width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-outline { background: #eee; color: var(--dark); }
+        .btn-staff { background: var(--staff); color: #000; margin-top: 20px; font-size: 14px; }
+        
+        .token-circle { font-size: 4rem; color: var(--primary); font-weight: bold; margin: 10px 0; }
+        .lang-text { font-size: 0.85rem; color: #666; display: block; }
+    </style>
+</head>
+<body>
+
+<div class="main-wrapper">
+    <header>
+        <img src="logo.png" alt="Sri Lanka Logo" class="gov-logo">
+        <h2 style="margin: 5px 0;">Base Hospital Sammanthurai</h2>
+        <p style="margin: 0;">OPD Appointment System</p>
+    </header>
+
+    <div id="page-welcome" class="container active">
+        <div class="card">
+            <h3>Welcome / ආයුබෝවන් / வணக்கம்</h3>
+            <p>Select an option to get your OPD token.</p>
+            <button class="btn btn-primary" onclick="showPage('page-doctors')">Get OPD Token</button>
+            <button class="btn btn-staff" onclick="viewDatabase()">Staff Login: View Database</button>
+        </div>
+    </div>
+
+    <div id="page-doctors" class="container">
+        <div class="card">
+            <h3>Select Doctor</h3>
+            <div id="doctor-list"></div>
+            <button class="btn btn-outline" onclick="showPage('page-welcome')">Back</button>
+        </div>
+    </div>
+
+    <div id="page-form" class="container">
+        <div class="card">
+            <h3>Patient Details</h3>
+            <div class="form-group"><label>Doctor</label><input type="text" id="selected-doc-display" disabled></div>
+            <div class="form-group"><label>Full Name <span class="lang-text">பெயர்</span></label><input type="text" id="patient-name" placeholder="Name"></div>
+            <div class="form-group"><label>Age <span class="lang-text">வயது</span></label><input type="number" id="patient-age" placeholder="Age"></div>
+            <button class="btn btn-primary" id="generate-btn" onclick="generateToken()">Confirm & Get Token</button>
+            <button class="btn btn-outline" onclick="showPage('page-doctors')">Cancel</button>
+        </div>
+    </div>
+
+    <div id="page-result" class="container">
+        <div class="card">
+            <h2 style="color: var(--primary); margin: 0;">SUCCESSFUL</h2>
+            <div class="token-circle" id="res-token">00</div>
+            <p><strong>Doctor:</strong> <span id="res-doc"></span></p>
+            <p><strong>Patient:</strong> <span id="res-name"></span></p>
+            <p><strong>Time:</strong> <span id="res-time"></span></p>
+            <hr>
+            <button class="btn btn-primary" onclick="window.print()">Print Token</button>
+            <button class="btn btn-outline" onclick="location.reload()">New Booking</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. SETTINGS
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbyzxA5W9c_mjF_z1rHbIRooesZTdL8YzTaQpzSMBJvVZMwk3GPpigDXt4TfqxIPtzT1Vw/exec'; 
+    const sheetURL = 'https://docs.google.com/spreadsheets/d/1tr8TjLTmQ4Ew21G2Rw4su7GJ2PzGxsZN4E4OsZ3I0lg/edit?gid=0#gid=0';
+    const adminPass = "admin789"; 
+
+    const doctors = [
+        { name: "Dr. K. Perera", dept: "General OPD", start: "08:00", limit: 40 },
+        { name: "Dr. S. Mohamed", dept: "Pediatrics", start: "09:00", limit: 30 },
+        { name: "Dr. R. Silva", dept: "Dental Unit", start: "08:30", limit: 20 }
+    ];
+
+    let selectedDocIndex = null;
+
+    function showPage(id) {
+        document.querySelectorAll('.container').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if(id === 'page-doctors') loadDoctors();
+    }
+
+    function viewDatabase() {
+        if(prompt("Enter Password:") === adminPass) { window.open(sheetURL, '_blank'); } 
+        else { alert("Access Denied"); }
+    }
+
+    function loadDoctors() {
+        const list = document.getElementById('doctor-list');
+        list.innerHTML = '';
+        doctors.forEach((doc, i) => {
+            let count = localStorage.getItem(`token_count_${i}`) || 0;
+            list.innerHTML += `
+                <div class="doc-card">
+                    <div><strong>${doc.name}</strong><br><small>${doc.dept}</small></div>
+                    <button class="btn-primary" style="padding:8px 15px; width:auto; border-radius:5px;" onclick="selectDoctor(${i})" ${count >= doc.limit ? 'disabled' : ''}>
+                        ${count >= doc.limit ? 'Full' : 'Select'}
+                    </button>
+                </div>`;
+        });
+    }
+
+    function selectDoctor(i) {
+        selectedDocIndex = i;
+        document.getElementById('selected-doc-display').value = doctors[i].name;
+        showPage('page-form');
+    }
+
+    async function generateToken() {
+        const name = document.getElementById('patient-name').value;
+        const age = document.getElementById('patient-age').value;
+        const btn = document.getElementById('generate-btn');
+        if(!name || !age) return alert("Please fill all details");
+
+        btn.disabled = true;
+        btn.innerText = "Saving to Database...";
+
+        let count = parseInt(localStorage.getItem(`token_count_${selectedDocIndex}`) || 0) + 1;
+        const doc = doctors[selectedDocIndex];
+        
+        // Calculate Time String
+        let [h, m] = doc.start.split(':').map(Number);
+        let total = (h * 60) + m + ((count - 1) * 10);
+        let timeStr = `${Math.floor(total/60)}:${(total%60<10?'0':'')+total%60} AM`;
+
+        const payload = { tokenNo: count, patient: name, age: age, doctor: doc.name, time: timeStr };
+
+        try {
+            await fetch(scriptURL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+            localStorage.setItem(`token_count_${selectedDocIndex}`, count);
+            
+            document.getElementById('res-token').innerText = count;
+            document.getElementById('res-doc').innerText = doc.name;
+            document.getElementById('res-name').innerText = name;
+            document.getElementById('res-time').innerText = timeStr;
+            showPage('page-result');
+        } catch (e) {
+            alert("Connection error. Try again.");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Confirm & Get Token";
+        }
+    }
+</script>
+</body>
+</html>
